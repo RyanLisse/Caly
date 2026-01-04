@@ -1,0 +1,23 @@
+{
+  "name": "caly-mcp",
+  "version": "1.0.0",
+  "bin": {
+    "caly-mcp": "./bin.ts"
+  },
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "bun run index.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.1",
+    "zod": "^4.3.5"
+  }
+}
