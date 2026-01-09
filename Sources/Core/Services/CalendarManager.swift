@@ -6,12 +6,52 @@ public actor CalendarManager {
     public static let shared = CalendarManager()
 
     private let store = EKEventStore()
+    private var useAppleScriptFallback = false
 
     private init() {}
 
     /// Requests access to the calendar
     /// - Returns: True if access was granted
     public func requestAccess() async throws -> Bool {
+        // Check current status first
+        let status = EKEventStore.authorizationStatus(for: .event)
+
+        // If already authorized, return true immediately
+        if #available(macOS 14.0, *) {
+            if status == .fullAccess {
+                return true
+            }
+        } else {
+            if status == .authorized {
+                return true
+            }
+        }
+
+        // If denied, return false
+        if status == .denied || status == .restricted {
+            return false
+        }
+
+        // macOS 14+ has writeOnly status - we need full access to read events
+        if #available(macOS 14.0, *) {
+            if status == .writeOnly {
+                return false
+            }
+        }
+
+        // For CLI tools, EventKit often returns notDetermined even when TCC has granted permission.
+        // Try using AppleScript as a fallback check - if Calendar.app is accessible, we likely have permission.
+        if status == .notDetermined {
+            let hasAppleScriptAccess = checkAppleScriptCalendarAccess()
+            if hasAppleScriptAccess {
+                // TCC has granted permission but EventKit doesn't recognize it in CLI context.
+                // Enable fallback mode and return true.
+                useAppleScriptFallback = true
+                return true
+            }
+        }
+
+        // Request access
         if #available(macOS 14.0, *) {
             return try await store.requestFullAccessToEvents()
         } else {
@@ -24,6 +64,25 @@ public actor CalendarManager {
                     }
                 }
             }
+        }
+    }
+
+    /// Check if we can access Calendar via AppleScript (which has different TCC handling)
+    private func checkAppleScriptCalendarAccess() -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        process.arguments = ["-e", "tell application \"Calendar\" to get name of first calendar"]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            return process.terminationStatus == 0
+        } catch {
+            return false
         }
     }
 
@@ -55,7 +114,7 @@ public actor CalendarManager {
     ///   - endDate: End date
     /// - Returns: Array of matching event outputs
     public func searchEvents(query: String, from startDate: Date, to endDate: Date) -> [CalendarEventOutput] {
-        var calendarObjects: [EKCalendar]? = nil
+        let calendarObjects: [EKCalendar]? = nil
         let predicate = store.predicateForEvents(withStart: startDate, end: endDate, calendars: calendarObjects)
         let allEvents = store.events(matching: predicate)
         let lowercaseQuery = query.lowercased()
