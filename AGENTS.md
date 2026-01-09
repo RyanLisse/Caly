@@ -1,44 +1,58 @@
-# Caly — Agent Guide
+# Repository Guidelines
 
-## Overview
-Caly is a macOS calendar “wizard” CLI (Swift/EventKit) plus a companion MCP server (TypeScript/Bun) that exposes the CLI as MCP tools.
+## Start Here
+- Read `~/Projects/agent-scripts/{AGENTS.MD,TOOLS.MD}` before making changes (skip if missing).
+- This repo follows the Peekaboo architecture pattern.
 
-## Repository Layout
+## Project Structure & Modules
+- `Sources/Core/` contains the framework-agnostic `CalyCore` library (EventKit integration, models, services).
+- `Sources/CLI/` contains the Swift CLI using ArgumentParser.
+- `Sources/MCP/` will contain the Swift-based MCP server (future).
+- `mcp-server/` hosts the current Bun-based MCP server that shells to the CLI.
+- Legacy `Apps/CLI/` structure is deprecated; use new `Sources/` layout.
+
+## Build, Test, and Development Commands
+- Build: `swift build` (debug) or `swift build -c release` (release)
+- Run CLI: `swift run caly --help`
+- Test: `swift test`
+- MCP server: `cd mcp-server && bun run index.ts`
+
+## Coding Style & Naming Conventions
+- Swift 6.0, 4-space indent, 120-column wrap
+- Strict concurrency enabled across all targets
+- Prefer small scoped extensions over large files
+- Actor-based services (e.g., `CalendarManager`)
+
+## Swift 6 Settings
+All targets use:
+```swift
+.enableExperimentalFeature("StrictConcurrency")
+.enableUpcomingFeature("ExistentialAny")
+.enableUpcomingFeature("NonisolatedNonsendingByDefault")
 ```
-./
-├── Apps/CLI/            # Swift CLI app (caly)
-├── mcp-server/          # Bun-based MCP server (caly-mcp)
-└── Assets/              # icons/images used for packaging/docs
-```
 
-## Where To Look
-- CLI entrypoint + EventKit integration: `Apps/CLI/Sources/Caly/main.swift`
-- MCP tool definitions + CLI invocation: `mcp-server/index.ts`
-- MCP entrypoint wrapper (shebang): `mcp-server/bin.ts`
+## Architecture Patterns
+- **Core library**: Framework-agnostic, no CLI dependencies
+- **Handler pattern**: Separate handlers for different tool types
+- **Actor-based services**: Thread-safe EventKit access
+- **ResultOutput<T>**: Generic wrapper for JSON/human output
 
-## Conventions (Project-Specific)
-- CLI is async-first: commands conform to `AsyncParsableCommand` and call into `CalendarManager` actor.
-- Calendar output supports both human output and JSON (`--json`) via `ResultOutput<T>`.
-- MCP server is Bun-first and ESM (`"type": "module"`). Prefer Bun-native patterns.
+## Reference Patterns
+- Peekaboo: `/Volumes/Main SSD/Developer/Peekaboo/`
+- Quorum: `/Users/shelton/Developer/Quorum/`
+- Handler pattern from: `cameroncooke/reloaderoo`
 
-## Anti-Patterns
-- Don’t check in Swift build artifacts from `Apps/CLI/.build/`.
-- Don’t hardcode user-specific calendar/event identifiers in code or docs.
-- Don’t assume a GUI session exists when running the MCP server (it shells out to `caly`).
+## Testing Guidelines
+- Add tests in `Tests/` directory
+- Use XCTest with async/await
+- Mock EventKit where possible
 
-## Subdirectory Guides
-- CLI-specific guidance: `Apps/CLI/AGENTS.md`
-- MCP-server-specific guidance: `mcp-server/AGENTS.md`
+## Commit & Pull Request Guidelines
+- Conventional Commits (`feat|fix|chore|docs|test|refactor`)
+- Scope optional: `feat(cli): add event filtering`
+- PRs should summarize intent and list test commands
 
-## Common Commands
-```bash
-# Swift CLI
-swift --version
-cd Apps/CLI
-swift run caly --help
-
-# MCP server
-cd mcp-server
-bun install
-bun run index.ts
-```
+## Security & Configuration
+- Never commit credentials
+- Calendar permissions managed by macOS
+- Respect user calendar privacy

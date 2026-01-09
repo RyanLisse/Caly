@@ -1,0 +1,119 @@
+import Foundation
+import EventKit
+
+/// Actor responsible for managing calendar operations
+public actor CalendarManager {
+    public static let shared = CalendarManager()
+
+    private let store = EKEventStore()
+
+    private init() {}
+
+    /// Requests access to the calendar
+    /// - Returns: True if access was granted
+    public func requestAccess() async throws -> Bool {
+        if #available(macOS 14.0, *) {
+            return try await store.requestFullAccessToEvents()
+        } else {
+            return try await withCheckedThrowingContinuation { continuation in
+                store.requestAccess(to: .event) { granted, error in
+                    if let error = error {
+                        continuation.resume(throwing: error)
+                    } else {
+                        continuation.resume(returning: granted)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Gets events within a date range
+    /// - Parameters:
+    ///   - startDate: Start date
+    ///   - endDate: End date
+    ///   - calendars: Optional list of calendar names to filter by
+    /// - Returns: Array of event outputs
+    public func getEvents(from startDate: Date, to endDate: Date, calendars: [String]? = nil) -> [CalendarEventOutput] {
+        var calendarObjects: [EKCalendar]? = nil
+
+        if let calendarNames = calendars, !calendarNames.isEmpty {
+            calendarObjects = store.calendars(for: .event).filter { cal in
+                calendarNames.contains { name in
+                    cal.title.localizedCaseInsensitiveContains(name)
+                }
+            }
+        }
+
+        let predicate = store.predicateForEvents(withStart: startDate, end: endDate, calendars: calendarObjects)
+        return store.events(matching: predicate).map { $0.toOutput() }
+    }
+
+    /// Searches events by keyword
+    /// - Parameters:
+    ///   - query: Search query
+    ///   - startDate: Start date
+    ///   - endDate: End date
+    /// - Returns: Array of matching event outputs
+    public func searchEvents(query: String, from startDate: Date, to endDate: Date) -> [CalendarEventOutput] {
+        var calendarObjects: [EKCalendar]? = nil
+        let predicate = store.predicateForEvents(withStart: startDate, end: endDate, calendars: calendarObjects)
+        let allEvents = store.events(matching: predicate)
+        let lowercaseQuery = query.lowercased()
+
+        return allEvents.filter { event in
+            event.title?.lowercased().contains(lowercaseQuery) == true ||
+            event.location?.lowercased().contains(lowercaseQuery) == true ||
+            event.notes?.lowercased().contains(lowercaseQuery) == true
+        }.map { $0.toOutput() }
+    }
+
+    /// Gets all available calendars
+    /// - Returns: Array of calendar outputs
+    public func getAllCalendars() -> [CalendarOutput] {
+        return store.calendars(for: .event).map { $0.toOutput() }
+    }
+
+    /// Creates a new calendar event
+    /// - Parameters:
+    ///   - title: Event title
+    ///   - startDate: Start date
+    ///   - endDate: End date
+    ///   - location: Optional location
+    ///   - notes: Optional notes
+    ///   - isAllDay: Whether it's an all-day event
+    ///   - calendarName: Optional calendar name
+    /// - Returns: The event identifier
+    /// - Throws: EventKit error if saving fails
+    public func createEvent(
+        title: String,
+        startDate: Date,
+        endDate: Date,
+        location: String?,
+        notes: String?,
+        isAllDay: Bool,
+        calendarName: String?
+    ) throws -> String {
+        let event = EKEvent(eventStore: store)
+        event.title = title
+        event.startDate = startDate
+        event.endDate = endDate
+        event.isAllDay = isAllDay
+        event.location = location
+        event.notes = notes
+
+        if let name = calendarName {
+            if let calendar = store.calendars(for: .event).first(where: {
+                $0.title.localizedCaseInsensitiveContains(name)
+            }) {
+                event.calendar = calendar
+            } else {
+                event.calendar = store.defaultCalendarForNewEvents
+            }
+        } else {
+            event.calendar = store.defaultCalendarForNewEvents
+        }
+
+        try store.save(event, span: .thisEvent)
+        return event.eventIdentifier ?? "unknown"
+    }
+}
