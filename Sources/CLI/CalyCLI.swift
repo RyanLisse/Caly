@@ -7,7 +7,15 @@ struct CalyCLI: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "caly",
         abstract: "🧙 Caly: Your quirky calendar wizard CLI",
-        subcommands: [ListCommand.self, SearchCommand.self, CalendarsCommand.self, CreateCommand.self],
+        subcommands: [
+            ListCommand.self,
+            SearchCommand.self,
+            CalendarsCommand.self,
+            CreateCommand.self,
+            UpdateCommand.self,
+            DeleteCommand.self,
+            MCPCommand.self,
+        ],
         defaultSubcommand: ListCommand.self
     )
 }

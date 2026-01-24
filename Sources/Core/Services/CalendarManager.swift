@@ -175,4 +175,48 @@ public actor CalendarManager {
         try store.save(event, span: .thisEvent)
         return event.eventIdentifier ?? "unknown"
     }
+
+    /// Deletes a calendar event by identifier
+    /// - Parameter eventIdentifier: The event identifier (from create or list)
+    /// - Returns: True if deleted successfully
+    /// - Throws: EventKit error if deletion fails
+    public func deleteEvent(eventIdentifier: String) throws -> Bool {
+        guard let event = store.event(withIdentifier: eventIdentifier) else {
+            return false
+        }
+        try store.remove(event, span: .thisEvent)
+        return true
+    }
+
+    /// Updates a calendar event
+    /// - Parameters:
+    ///   - eventIdentifier: The event identifier
+    ///   - title: New title (nil to keep existing)
+    ///   - startDate: New start date (nil to keep existing)
+    ///   - endDate: New end date (nil to keep existing)
+    ///   - location: New location (nil to keep existing)
+    ///   - notes: New notes (nil to keep existing)
+    /// - Returns: True if updated successfully
+    /// - Throws: EventKit error if update fails
+    public func updateEvent(
+        eventIdentifier: String,
+        title: String?,
+        startDate: Date?,
+        endDate: Date?,
+        location: String?,
+        notes: String?
+    ) throws -> Bool {
+        guard let event = store.event(withIdentifier: eventIdentifier) else {
+            return false
+        }
+
+        if let title = title { event.title = title }
+        if let startDate = startDate { event.startDate = startDate }
+        if let endDate = endDate { event.endDate = endDate }
+        if let location = location { event.location = location }
+        if let notes = notes { event.notes = notes }
+
+        try store.save(event, span: .thisEvent)
+        return true
+    }
 }

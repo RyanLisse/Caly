@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-ffd60a?style=flat-square)](https://opensource.org/licenses/MIT)
 [![MCP Server](https://img.shields.io/badge/MCP-Server-2ea44f?style=flat-square)](https://modelcontextprotocol.io/)
 
-Caly brings calendar automation to macOS through a Swift CLI and MCP server. Read, search, and create Calendar.app events via EventKit — from the terminal or any MCP client.
+Caly brings calendar automation to macOS through a Swift CLI and native MCP server. Read, search, and create Calendar.app events via EventKit — from the terminal or any MCP client.
 
 ## What you get
 
@@ -17,7 +17,7 @@ Caly brings calendar automation to macOS through a Swift CLI and MCP server. Rea
 | **Search Events** | Find events by keyword across date ranges |
 | **List Calendars** | Enumerate all available calendars |
 | **Create Events** | Add new events with title, dates, calendar |
-| **MCP Server** | All features exposed as MCP tools for AI agents |
+| **MCP Server** | Native Swift MCP server for AI agents |
 
 ## Install
 
@@ -59,16 +59,19 @@ caly create "Team Meeting" \
 | `search` | `<query>`, `--days`, `--json` | Search events by keyword |
 | `calendars` | `--json` | List available calendars |
 | `create` | `--start`, `--end`, `--calendar` | Create a new event |
+| `mcp serve` | — | Start native MCP server |
+| `mcp tools` | — | List available MCP tools |
 
 ## MCP Server
 
-The Bun-based MCP server shells out to the `caly` CLI.
+Native Swift MCP server using [swift-sdk](https://github.com/modelcontextprotocol/swift-sdk):
 
 ```bash
-# Ensure caly is on PATH first
-cd mcp-server
-bun install
-bun run index.ts
+# Start MCP server (stdio transport)
+caly mcp serve
+
+# List available tools
+caly mcp tools
 ```
 
 ### MCP Tools
@@ -86,8 +89,8 @@ bun run index.ts
 {
   "mcpServers": {
     "caly": {
-      "command": "bun",
-      "args": ["run", "/path/to/Caly/mcp-server/index.ts"]
+      "command": "caly",
+      "args": ["mcp", "serve"]
     }
   }
 }
@@ -104,10 +107,23 @@ Sources/
 │   ├── Services/   # CalendarManager (actor-based EventKit wrapper)
 │   └── Exports.swift
 ├── CLI/            # Commander subcommands
-│   ├── Commands/   # ListCommand, SearchCommand, CalendarsCommand, CreateCommand
+│   ├── Commands/   # ListCommand, SearchCommand, CalendarsCommand, CreateCommand, MCPCommand
+│   ├── MCP/        # Native Swift MCP server
+│   │   ├── CalyMCPServer.swift
+│   │   └── handlers/
+│   │       └── CalyToolHandler.swift
 │   └── CalyCLI.swift
-├── MCP/            # MCP server (future Swift implementation)
-└── Executable/     # Main entry point
+```
+
+### Handler Pattern
+
+MCP tools are handled by `CalyToolHandler` actor:
+
+```swift
+public actor CalyToolHandler {
+    public func listTools() -> ListTools.Result
+    public func callTool(_ params: CallTool.Parameters) async throws -> CallTool.Result
+}
 ```
 
 ## Requirements
@@ -115,7 +131,6 @@ Sources/
 - **macOS 13+** (Ventura or later)
 - **Swift 6.0+** toolchain
 - **Calendar permissions** (EventKit prompts on first run)
-- **Bun** (for MCP server)
 
 ## Development
 
@@ -126,11 +141,11 @@ swift build
 # Run CLI
 swift run caly --help
 
+# Run MCP server
+swift run caly mcp serve
+
 # Test
 swift test
-
-# MCP server
-cd mcp-server && bun run index.ts
 ```
 
 ### Swift 6 Settings
@@ -148,7 +163,7 @@ All targets use strict concurrency:
 - First run triggers macOS Calendar permission prompts
 - Headless MCP clients may need manual permission grants
 - Calendar matching is by name (not stable IDs)
-- Legacy `Apps/CLI/` structure is deprecated
+- Legacy `mcp-server/` (TypeScript) is deprecated — use native `caly mcp serve`
 
 ## License
 

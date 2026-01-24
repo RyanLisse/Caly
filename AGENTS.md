@@ -1,58 +1,69 @@
-# Repository Guidelines
+READ ~/Developer/agent-scripts/AGENTS.MD BEFORE ANYTHING (skip if missing)
 
-## Start Here
-- Read `~/Projects/agent-scripts/{AGENTS.MD,TOOLS.MD}` before making changes (skip if missing).
-- This repo follows the Peekaboo architecture pattern.
+# Caly — Agent Guide
 
-## Project Structure & Modules
-- `Sources/Core/` contains the framework-agnostic `CalyCore` library (EventKit integration, models, services).
-- `Sources/CLI/` contains the Swift CLI using ArgumentParser.
-- `Sources/MCP/` will contain the Swift-based MCP server (future).
-- `mcp-server/` hosts the current Bun-based MCP server that shells to the CLI.
-- Legacy `Apps/CLI/` structure is deprecated; use new `Sources/` layout.
+## Overview
+Caly is a macOS calendar CLI + native Swift MCP server. Uses EventKit for calendar operations.
 
-## Build, Test, and Development Commands
-- Build: `swift build` (debug) or `swift build -c release` (release)
-- Run CLI: `swift run caly --help`
-- Test: `swift test`
-- MCP server: `cd mcp-server && bun run index.ts`
-
-## Coding Style & Naming Conventions
-- Swift 6.0, 4-space indent, 120-column wrap
-- Strict concurrency enabled across all targets
-- Prefer small scoped extensions over large files
-- Actor-based services (e.g., `CalendarManager`)
-
-## Swift 6 Settings
-All targets use:
-```swift
-.enableExperimentalFeature("StrictConcurrency")
-.enableUpcomingFeature("ExistentialAny")
-.enableUpcomingFeature("NonisolatedNonsendingByDefault")
+## Architecture (Peekaboo Standard)
+```
+Sources/
+├── Core/                    # Framework-agnostic library
+│   ├── Models/              # CalendarEventOutput, CalendarOutput, ResultOutput<T>
+│   ├── Services/            # CalendarManager (actor)
+│   └── Exports.swift
+├── CLI/                     # CLI interface
+│   ├── Commands/            # ListCommand, SearchCommand, CalendarsCommand, CreateCommand, MCPCommand
+│   ├── MCP/                 # Native Swift MCP server
+│   │   ├── CalyMCPServer.swift
+│   │   └── handlers/
+│   │       └── CalyToolHandler.swift
+│   └── CalyCLI.swift
 ```
 
-## Architecture Patterns
-- **Core library**: Framework-agnostic, no CLI dependencies
-- **Handler pattern**: Separate handlers for different tool types
-- **Actor-based services**: Thread-safe EventKit access
-- **ResultOutput<T>**: Generic wrapper for JSON/human output
+## Key Files
+| File | Purpose |
+|------|---------|
+| `Sources/Core/Services/CalendarManager.swift` | EventKit wrapper (actor) |
+| `Sources/Core/Models/CalendarModels.swift` | Data models |
+| `Sources/CLI/MCP/CalyMCPServer.swift` | MCP server entry |
+| `Sources/CLI/MCP/handlers/CalyToolHandler.swift` | MCP tool handler (handler pattern) |
 
-## Reference Patterns
-- Peekaboo: `/Volumes/Main SSD/Developer/Peekaboo/`
-- Quorum: `/Users/shelton/Developer/Quorum/`
-- Handler pattern from: `cameroncooke/reloaderoo`
+## Patterns Used
+- **Handler Pattern:** CalyToolHandler handles all MCP tools
+- **Actor Pattern:** CalendarManager and CalyMCPServer are actors
+- **Config Priority:** CLI args > env vars > defaults
+- **Swift 6:** StrictConcurrency, ExistentialAny, NonisolatedNonsendingByDefault
 
-## Testing Guidelines
-- Add tests in `Tests/` directory
-- Use XCTest with async/await
-- Mock EventKit where possible
+## MCP Tools
+- `caly_list` - List calendar events
+- `caly_search` - Search events by keyword
+- `caly_calendars` - List calendars
+- `caly_create` - Create new event
 
-## Commit & Pull Request Guidelines
-- Conventional Commits (`feat|fix|chore|docs|test|refactor`)
-- Scope optional: `feat(cli): add event filtering`
-- PRs should summarize intent and list test commands
+## Common Commands
+```bash
+# Build
+swift build
 
-## Security & Configuration
-- Never commit credentials
-- Calendar permissions managed by macOS
-- Respect user calendar privacy
+# Run CLI
+swift run caly list --days 7
+swift run caly search "meeting"
+swift run caly calendars
+swift run caly create "Event" --start 2026-01-10T10:00:00Z --end 2026-01-10T11:00:00Z
+
+# Run MCP server
+swift run caly mcp serve
+
+# List MCP tools
+swift run caly mcp tools
+```
+
+## Deprecated
+- `mcp-server/` - TypeScript/Bun MCP server (use `caly mcp serve` instead)
+- `Apps/CLI/` - Old CLI structure (use `Sources/CLI/` instead)
+
+## Notes
+- EventKit requires calendar permissions (TCC)
+- First run triggers macOS permission prompts
+- Calendar matching is by name (not stable IDs)
